@@ -490,7 +490,7 @@
         }
 
         // -------------------- الإعدادات والمتغيرات العامة --------------------
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyf1LnxXlGpllpyNeO9Gez1ah-DUSaVfTk3KhPDV8lDtN_Zga1GMZDaM387o0XWhIIW/exec';
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTCkWGX2AqZVL70j38XbfphD_4-jHZx71ro-N77b39vBY7u5pftZ0hXtbVRZ0kDNAr/exec';
         const KITCHEN_API_URL = 'https://script.google.com/macros/s/AKfycbzU7pp0Ul8KNDT4iEd7kGFxNrXYzX4B4zfdYANjE59ABvMq1vIKlmEM4gAOipY47Zeoiw/exec';
 
         const CREDENTIALS = { user: 'Mismar', pass: 'Mismar.11' };
@@ -506,23 +506,12 @@
         let salesChart = null;
         let currentDatePreset = 'today';
 
-        // مفاتيح التخزين المحلي
+        // مفاتيح التخزين المحلي (تمت إزالة PRODUCT_COSTS)
         const STORAGE_KEYS = {
             INVENTORY: 'tel_alsindian_inventory',
             ORDERS_CACHE: 'tel_alsindian_orders_cache',
-            ORDERS_TIMESTAMP: 'tel_alsindian_orders_timestamp',
-            PRODUCT_COSTS: 'tel_alsindian_product_costs_v2'
+            ORDERS_TIMESTAMP: 'tel_alsindian_orders_timestamp'
         };
-
-        // -------------------- دالة حفظ واسترجاع التكاليف --------------------
-        function getProductCostBackup() {
-            try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.PRODUCT_COSTS) || '{}'); } catch (e) { return {}; }
-        }
-        function saveProductCostBackup(productId, cost) {
-            const costs = getProductCostBackup();
-            costs[productId] = cost;
-            localStorage.setItem(STORAGE_KEYS.PRODUCT_COSTS, JSON.stringify(costs));
-        }
 
         // -------------------- دوال المخزون --------------------
         function loadInventoryFromStorage() {
@@ -835,13 +824,13 @@
         async function saveProduct() {
             const costVal = parseFloat(document.getElementById('prod_cost').value) || 0;
             const data = { id: editingItem ? editingItem.id : generateId(), categoryId: document.getElementById('prod_catId').value, name: document.getElementById('prod_name').value, description: document.getElementById('prod_desc').value, price: parseFloat(document.getElementById('prod_price').value), cost: costVal, image: document.getElementById('prod_image').value, isNew: document.getElementById('prod_isNew').value === 'true', order: parseInt(document.getElementById('prod_order').value) || 0 };
-            saveProductCostBackup(data.id, costVal);
+            // Removed local storage backup for cost - relying on server save
             if (editingItem) { const idx = appData.products.findIndex(p => p.id === editingItem.id); appData.products[idx] = data; } else { appData.products.push(data); }
             renderProducts(); closeModal(); await saveToServer('products');
         }
         window.deleteItem = async function(type, id) {
             if (!confirm('تأكيد الحذف؟')) return;
-            if(type === 'products') { const costs = getProductCostBackup(); delete costs[id]; localStorage.setItem(STORAGE_KEYS.PRODUCT_COSTS, JSON.stringify(costs)); }
+            // Removed local storage cleanup for product costs as we use server storage now
             appData[type] = appData[type].filter(item => item.id !== id);
             if (type === 'categories') renderCategories(); else renderProducts();
             await saveToServer(type);
@@ -860,8 +849,8 @@
                 const res = await fetch(`${SCRIPT_URL}?action=getMenuData`); const data = await res.json();
                 if (data.success) {
                     appData.categories = data.categories || []; appData.products = data.products || [];
-                    const savedCosts = getProductCostBackup();
-                    appData.products.forEach(p => { if (savedCosts[p.id] !== undefined) { p.cost = savedCosts[p.id]; } else if (typeof p.cost === 'undefined') { p.cost = 0; } });
+                    // Use server cost directly, default to 0 if missing
+                    appData.products.forEach(p => { if (typeof p.cost === 'undefined' || p.cost === null) { p.cost = 0; } });
                     renderCategories(); renderProducts(); loadInventoryFromStorage(); if (currentTab === 'inventory') renderInventory();
                 }
             } catch (e) { console.error(e); showToast('فشل الاتصال بسيرفر المنيو'); }
